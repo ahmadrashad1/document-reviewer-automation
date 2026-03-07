@@ -1,0 +1,77 @@
+{
+  "name": "Document Reviewer (Simple)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "id": "webhook-doc-review",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize input and build Groq (OpenAI-compatible) chat body\nconst raw = $input.first().json;\nconst body = raw.body ?? raw;\nconst text = body.text ?? body.documentText ?? '';\nconst query = body.query ?? '';\n\nif (!text || !query) {\n  throw new Error('Request body must include \"text\" and \"query\"');\n}\n\nconst prompt = 'You are a document analyst. Use only the following document text to answer the question. If the answer is not in the text, say so.\\n\\nDocument text:\\n' + text + '\\n\\nQuestion: ' + query + '\\n\\nAnswer (concise, plain text):';\n\nconst groqBody = {\n  model: 'llama-3.1-8b-instant',\n  messages: [{ role: 'user', content: prompt }],\n  max_tokens: 2048,\n  temperature: 0.3\n};\nconst groqBodyJson = JSON.stringify(groqBody);\n\nreturn [{ json: { text, query, groqBody, groqBodyJson } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "id": "extract-body",
+      "name": "Extract Body"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_GROQ_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.groqBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [680, 300],
+      "id": "groq-generate",
+      "name": "Groq Generate"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { answer: $json.choices?.[0]?.message?.content ?? $json.response ?? '' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Extract Body", "type": "main", "index": 0 }]]
+    },
+    "Extract Body": {
+      "main": [[{ "node": "Groq Generate", "type": "main", "index": 0 }]]
+    },
+    "Groq Generate": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true }
+}

@@ -1,0 +1,64 @@
+services:
+  backend:
+    build:
+      context: ./ai-doc-backend
+    container_name: ai-doc-backend
+    restart: unless-stopped
+    environment:
+      # Use the Document Reviewer (Simple) workflow path; override with N8N_WEBHOOK_URL if needed
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678/webhook-test/document-review}
+      - PORT=5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ai-doc-backend/uploads:/usr/src/app/uploads
+    depends_on:
+      - n8n
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ai-doc-frontend
+    restart: unless-stopped
+    environment:
+      # Adjust according to your frontend framework (e.g. REACT_APP_*, NEXT_PUBLIC_*, VITE_*)
+      # Browser calls backend on host; use localhost so it works from your machine
+      - VITE_BACKEND_URL=http://localhost:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ai-doc-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_LOG_LEVEL=info
+    volumes:
+      # Mount your existing n8n data so you can log in with your previous account.
+      # On Windows this is typically %USERPROFILE%\.n8n (e.g. C:\Users\You\.n8n).
+      # On Linux/Mac create a .env with: USERPROFILE=$HOME
+      - ${USERPROFILE}/.n8n:/home/node/.n8n
+    depends_on:
+      - ollama
+
+  # Optional: run Ollama in Docker so n8n can use http://ollama:11434 (no host.docker.internal needed)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-doc-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull a model after start: docker exec ai-doc-ollama ollama pull llama3.1
+
+volumes:
+  ollama_data:

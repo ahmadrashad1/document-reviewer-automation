@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Environment and secrets (do not commit)
+.env
+.env.local
+.env.*.local
+
+# Uploads and temp files
+uploads/
+*.log
+logs/
+
+# OS and editors
+.DS_Store
+.idea
+.vscode/
+
+# Optional: Python/n8n local venv if present
+n8n/venv/
