@@ -1,6 +1,6 @@
 # Complete Setup Guide
 
-This guide walks you through setting up and testing the entire AI Document Analysis system.
+This guide walks you through setting up and testing the entire AI Document Analysis system. On **Windows**, use PowerShell and run scripts from the project root (e.g. `.\scripts\health-check.ps1`). For a short run checklist, see the **Run on Windows** table in the main [README](../README.md).
 
 ## Prerequisites
 

@@ -2,7 +2,27 @@
 
 **Problem:** Large financial documents are hard to navigate. When an analyst needs a specific part of a document, they should be able to **query** it and get **relevant sections** back instead of reading the whole file.
 
-**Solution:** A **RAG (Retrieval Augmented Generation)** pipeline powered by **n8n**: upload a PDF, ask a question, and get an AI-generated answer grounded in the document. The system can run in a **simple mode** (full document + LLM) or be extended with **RAG** (chunk → embed → Chroma → retrieve → LLM) for better scalability on very long documents.
+**Solution:** A **RAG (Retrieval Augmented Generation)** pipeline powered by **n8n**: upload a PDF, ask a question, and get an AI-generated answer grounded in the document. The system runs in a **simple mode** (full document + LLM); it can be extended with RAG (Chroma) for very long documents.
+
+---
+
+## Run on Windows
+
+**Prerequisites:** Node.js (LTS), Docker Desktop (for n8n), and a [Groq API key](https://console.groq.com) (free). Use **PowerShell**; run all commands from the **project root** (`document-reviewer-automation`).
+
+| Step | Action |
+|------|--------|
+| 1 | **Install:** `npm install --prefix ai-doc-backend` then `npm install --prefix frontend` |
+| 2 | **Start n8n:** `.\scripts\start-n8n-docker.ps1` (or `docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest`) |
+| 3 | **Import workflow:** Open http://localhost:5678 → Workflows → Import from File → select `n8n-workflow-document-reviewer.json` → open **Groq Generate** node → set Authorization to `Bearer YOUR_GROQ_API_KEY` → Save → set workflow **Active** (toggle ON) |
+| 4 | **Backend env:** Ensure `ai-doc-backend\.env` contains `N8N_WEBHOOK_URL=http://localhost:5678/webhook/document-review` and `PORT=5000` |
+| 5 | **Start backend:** `cd ai-doc-backend; npm start` (leave running) |
+| 6 | **Start frontend:** In a new terminal: `cd frontend; npm run dev` |
+| 7 | **Use app:** Open http://localhost:3000 → upload a PDF (e.g. `test.pdf`) → enter a question → **Analyze** |
+
+**URLs:** n8n http://localhost:5678 · Backend http://localhost:5000 · Frontend http://localhost:3000  
+
+If the frontend shows "webhook is not registered", turn the workflow **Active** in n8n (top-right toggle). See [NEXT_STEPS.md](NEXT_STEPS.md) for more detail and troubleshooting.
 
 ---
 
@@ -36,6 +56,7 @@
 | **`ai-doc-backend/`** | Express backend: PDF upload, text extraction, proxy to n8n webhook. |
 | **`frontend/`** | React (Vite) UI: file upload, query input, results display. |
 | **`n8n/`** | n8n-related assets: `package.json`, Chroma persistence data (when using RAG). |
+| **`test.pdf`** | Sample PDF in the repo for testing the app (optional). |
 
 ---
 
@@ -59,33 +80,20 @@ The **correct and final** workflow file is **`n8n-workflow-document-reviewer.jso
 
 ---
 
-## How to open and run the correct, final project
+## Detailed run steps (Windows)
 
-1. **Open the project folder**  
-   `document-reviewer-automation` (this repo root).
+Use **PowerShell** from the project root. Same flow as the table above.
 
-2. **Install dependencies** (one time):
-   ```bash
+1. **Install dependencies** (once):
+   ```powershell
    npm install --prefix ai-doc-backend
    npm install --prefix frontend
    ```
 
-3. **Start n8n** (Terminal 1).
+2. **Start n8n**  
+   Run `.\scripts\start-n8n-docker.ps1` or `docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest`. Open http://localhost:5678 (without `-p 5678:5678` the webhook is not reachable).
 
-   **Option A – Docker (publish port so localhost works):**
-   ```bash
-   docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest
-   ```
-   Or run: `.\scripts\start-n8n-docker.ps1`  
-   **Important:** You must use `-p 5678:5678` so the editor is reachable at **http://localhost:5678**. Without it, the container has port 5678 only inside Docker, so the browser shows nothing.
-
-   **Option B – Local (no Docker):**
-   ```bash
-   n8n start
-   ```
-   Open **http://localhost:5678**.
-
-4. **Import the workflow** in n8n:
+3. **Import and activate workflow** in n8n:
    - **Workflows** → **Import from File**
    - Select **`n8n-workflow-document-reviewer.json`** from the project root.
    - In the **Groq Generate** node, set **Authorization** to `Bearer YOUR_GROQ_API_KEY` ([docs/GROQ_SETUP.md](docs/GROQ_SETUP.md)).
@@ -144,72 +152,6 @@ The **importable workflow** (`n8n-workflow-document-reviewer.json`) is the **sim
 
 ---
 
-## Quick Start
-
-### Prerequisites
-
-- **Node.js** (for backend and frontend)
-- **n8n** (local or Docker)
-- **LLM:** Groq (recommended, no local GPU) or Ollama (local)
-
-### 1. Clone and install
-
-```bash
-cd document-reviewer-automation
-npm install --prefix ai-doc-backend
-npm install --prefix frontend
-```
-
-### 2. Start n8n
-
-```bash
-n8n start
-# Or with Docker: see docker-compose.yml
-```
-
-Open n8n at **http://localhost:5678**.
-
-### 3. Import the workflow
-
-1. In n8n: **Workflows** → **Import from File** (or **Add workflow** → **Import**).
-2. Choose **`n8n-workflow-document-reviewer.json`** from the project root.
-3. **Groq:** In the **Groq Generate** node, set the **Authorization** header to `Bearer YOUR_GROQ_API_KEY` (see [docs/GROQ_SETUP.md](docs/GROQ_SETUP.md)).
-4. **Ollama:** Replace the Groq node with an Ollama/HTTP Request node to `http://localhost:11434/api/generate` (or `http://host.docker.internal:11434` if n8n runs in Docker).
-5. **Save** and **Activate** the workflow.
-6. Copy the **Production** webhook URL (e.g. `http://localhost:5678/webhook/document-review`).
-
-### 4. Configure backend
-
-Create `ai-doc-backend/.env` (see `ai-doc-backend/.env.example`):
-
-```env
-N8N_WEBHOOK_URL=http://localhost:5678/webhook/document-review
-PORT=5000
-```
-
-### 5. Start backend and frontend
-
-```bash
-# Terminal 1 – backend
-cd ai-doc-backend && npm start
-
-# Terminal 2 – frontend
-cd frontend && npm run dev
-```
-
-- Frontend: **http://localhost:3000**
-- Upload a PDF, enter a question, click **Analyze Document**. The backend will extract text, call the n8n webhook, and show the `answer` in the UI.
-
-### Optional: Chroma (for RAG)
-
-If you add the RAG pipeline in n8n:
-
-1. Install and start Chroma (e.g. `pip install chromadb` then `chroma run --host localhost --port 8000` from the `n8n` folder or a venv).
-2. Create the collection: `python scripts/setup_chroma.py` (with Chroma running).
-3. Build the chunk → embed → Chroma → query → LLM flow in n8n using the steps in **docs/N8N_WORKFLOW_GUIDE.md** (Section 4).
-
----
-
 ## Services Reference
 
 | Service   | Port  | Purpose |
@@ -232,9 +174,9 @@ If you add the RAG pipeline in n8n:
 
 ---
 
-## Testing the webhook directly
+## Testing the webhook
 
-With the workflow **Active**:
+With the workflow **Active**. On Windows (PowerShell) run `.\scripts\test-workflow.ps1` and enter `http://localhost:5678/webhook/document-review` when prompted. Alternatively:
 
 ```bash
 curl -X POST http://localhost:5678/webhook/document-review \

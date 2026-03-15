@@ -1,6 +1,6 @@
-# What to do now (n8n is running)
+# Run on Windows (step-by-step)
 
-Follow these in order.
+Use **PowerShell**; run all commands from the **project root**. If n8n is not running yet, start it first (e.g. `.\scripts\start-n8n-docker.ps1`). Then follow these in order.
 
 ---
 
