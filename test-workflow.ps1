@@ -5,7 +5,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Configuration
-$n8nWebhookUrl = Read-Host "Enter your n8n webhook URL (e.g., http://localhost:5678/webhook/document-analysis)"
+$n8nWebhookUrl = Read-Host "Enter your n8n webhook URL (e.g., http://localhost:5678/webhook/document-review)"
 if ([string]::IsNullOrWhiteSpace($n8nWebhookUrl)) {
     Write-Host "❌ Webhook URL is required!" -ForegroundColor Red
     exit 1
@@ -33,8 +33,8 @@ try {
     Write-Host "Response:" -ForegroundColor Cyan
     $response | ConvertTo-Json -Depth 10 | Write-Host -ForegroundColor White
     
-    # if the response is just text, treat as success
-    if ($response -is [string] -or $response.success) {
+    # n8n returns { answer: "..." }; backend wraps as { success: true, data: ... }
+    if ($response -is [string] -or $response.success -or $response.answer) {
         Write-Host "";
         Write-Host "✅ Full workflow test PASSED!" -ForegroundColor Green
     } else {
