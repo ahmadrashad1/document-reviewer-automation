@@ -50,8 +50,7 @@ const ResultsDisplay = ({ results, query, fileName, onReset }) => {
           </div>
         </div>
         <button className="reset-button" onClick={onReset} type="button">
-          <span className="reset-icon">↻</span>
-          New Analysis
+          New analysis
         </button>
       </div>
 
@@ -66,10 +65,7 @@ const ResultsDisplay = ({ results, query, fileName, onReset }) => {
       </div>
 
       <div className="results-footer">
-        <div className="results-info">
-          <span className="info-icon">ℹ️</span>
-          <span>This analysis was powered by AI using semantic search and LLM reasoning</span>
-        </div>
+        <p className="results-disclaimer">Answer generated from document content.</p>
       </div>
     </div>
   )

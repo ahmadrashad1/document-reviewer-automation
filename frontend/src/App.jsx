@@ -93,12 +93,9 @@ function App() {
     <div className="app">
       <div className="app-container">
         <header className="app-header">
-          <h1 className="app-title">
-            <span className="app-icon">📄</span>
-            AI Document Analyzer
-          </h1>
+          <h1 className="app-title">Document Reviewer</h1>
           <p className="app-subtitle">
-            Upload a PDF document and ask questions using AI-powered analysis
+            Upload a PDF and query specific sections. Analysis is grounded in the document text.
           </p>
         </header>
 
@@ -119,9 +116,9 @@ function App() {
               />
 
               {error && (
-                <div className="error-message">
-                  <span className="error-icon">⚠️</span>
-                  {error}
+                <div className="error-message" role="alert">
+                  <span className="error-label">Error</span>
+                  <span className="error-text">{error}</span>
                 </div>
               )}
 
@@ -129,7 +126,7 @@ function App() {
                 <div className="loading-container">
                   <LoadingSpinner />
                   <p className="loading-text">
-                    Analyzing your document... This may take a few moments.
+                    Analyzing document. This may take a moment.
                   </p>
                 </div>
               )}
@@ -145,7 +142,7 @@ function App() {
         </main>
 
         <footer className="app-footer">
-          <p>Powered by n8n and Groq</p>
+          <p>Document Reviewer · n8n workflow</p>
         </footer>
       </div>
     </div>

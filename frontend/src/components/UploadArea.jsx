@@ -73,7 +73,7 @@ const UploadArea = ({ file, onFileSelect, disabled }) => {
         
         {file ? (
           <div className="file-info">
-            <div className="file-icon">📄</div>
+            <div className="file-badge">PDF</div>
             <div className="file-details">
               <div className="file-name">{file.name}</div>
               <div className="file-size">{formatFileSize(file.size)}</div>
@@ -89,18 +89,18 @@ const UploadArea = ({ file, onFileSelect, disabled }) => {
                   }
                 }}
                 type="button"
+                aria-label="Remove file"
               >
-                ✕
+                <span aria-hidden="true">×</span>
               </button>
             )}
           </div>
         ) : (
           <div className="upload-placeholder">
-            <div className="upload-icon">📤</div>
             <p className="upload-text">
-              <span className="upload-text-main">Click to upload</span> or drag and drop
+              <span className="upload-text-main">Choose a file</span> or drag and drop
             </p>
-            <p className="upload-text-sub">PDF files only (max 20MB)</p>
+            <p className="upload-text-sub">PDF only, max 20MB</p>
           </div>
         )}
       </div>

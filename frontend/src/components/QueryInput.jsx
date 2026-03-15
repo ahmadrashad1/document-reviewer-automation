@@ -29,7 +29,7 @@ const QueryInput = ({ value, onChange, onAnalyze, disabled }) => {
           onKeyPress={handleKeyPress}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Ask a question about the document... (e.g., 'What is the main topic?' or 'Summarize the key points')"
+          placeholder="e.g. What is the main topic? Summarize the key points."
           disabled={disabled}
           rows={4}
         />
@@ -49,10 +49,7 @@ const QueryInput = ({ value, onChange, onAnalyze, disabled }) => {
                 Analyzing...
               </>
             ) : (
-              <>
-                <span className="button-icon">🔍</span>
-                Analyze Document
-              </>
+              'Analyze'
             )}
           </button>
         </div>
