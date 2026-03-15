@@ -2,27 +2,27 @@
 
 **Problem:** Large financial documents are hard to navigate. When an analyst needs a specific part of a document, they should be able to **query** it and get **relevant sections** back instead of reading the whole file.
 
-**Solution:** A **RAG (Retrieval Augmented Generation)** pipeline powered by **n8n**: upload a PDF, ask a question, and get an AI-generated answer grounded in the document. The workflow chunks the document, embeds chunks with **Ollama** (e.g. `nomic-embed-text`), stores them in **Chroma**, retrieves relevant chunks for the query, and generates the answer with **Groq**.
+**Solution:** A **RAG (Retrieval Augmented Generation)** pipeline powered by **n8n**: upload a PDF, ask a question, and get an AI-generated answer grounded in the document. The workflow chunks the document, embeds chunks with **Google Gemini** (`gemini-embedding-001` via Gemini API / Google AI Studio free tier), stores them in **Chroma**, retrieves relevant chunks for the query, and generates the answer with **Groq**.
 
 ---
 
 ## Run on Windows
 
-**Prerequisites:** Node.js (LTS), Docker Desktop (for n8n), a [Groq API key](https://console.groq.com) (free), **Chroma** (port 8000), and **Ollama** (port 11434) for embeddings. Use **PowerShell**; run all commands from the **project root** (`document-reviewer-automation`).
+**Prerequisites:** Node.js (LTS), Docker Desktop (for n8n), a [Groq API key](https://console.groq.com) (free), a [Google AI / Gemini API key](https://aistudio.google.com/apikey) (free tier), and **Chroma** (port 8000). Use **PowerShell**; run all commands from the **project root** (`document-reviewer-automation`).
 
 | Step | Action |
 |------|--------|
 | 1 | **Install:** `npm install --prefix ai-doc-backend` then `npm install --prefix frontend` |
 | 2 | **Start n8n:** `.\scripts\start-n8n-docker.ps1` (or `docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest`) |
 | 3 | **Start Chroma:** `.\scripts\start-chroma.ps1` then create collection: `python scripts/setup_chroma.py` (see [docs/RAG_SETUP.md](docs/RAG_SETUP.md)) |
-| 4 | **Start Ollama** (for embeddings): Install [Ollama](https://ollama.com), run `ollama pull nomic-embed-text` |
-| 5 | **Import workflow:** Open http://localhost:5678 → Workflows → Import from File → select `n8n-workflow-document-reviewer.json` → open **Groq Generate** node → set Authorization to `Bearer YOUR_GROQ_API_KEY` → Save → set workflow **Active** (toggle ON) |
+| 4 | **Get Gemini API key:** Create a key at [Google AI Studio](https://aistudio.google.com/apikey) (free tier supports `gemini-embedding-001`) |
+| 5 | **Import workflow:** Open http://localhost:5678 → Workflows → Import from File → select `n8n-workflow-document-reviewer.json` → set **Groq Generate** node Authorization to `Bearer YOUR_GROQ_API_KEY` → set **Google Embed Chunks** and **Google Embed Query** nodes header `x-goog-api-key` to your Gemini API key → Save → set workflow **Active** (toggle ON) |
 | 6 | **Backend env:** Ensure `ai-doc-backend\.env` contains `N8N_WEBHOOK_URL=http://localhost:5678/webhook/document-review` and `PORT=5000` |
 | 7 | **Start backend:** `cd ai-doc-backend; npm start` (leave running) |
 | 8 | **Start frontend:** In a new terminal: `cd frontend; npm run dev` |
 | 9 | **Use app:** Open http://localhost:3000 → upload a PDF (e.g. `test.pdf`) → enter a question → **Analyze** |
 
-**URLs:** n8n http://localhost:5678 · Backend http://localhost:5000 · Frontend http://localhost:3000 · Chroma http://localhost:8000 · Ollama http://localhost:11434  
+**URLs:** n8n http://localhost:5678 · Backend http://localhost:5000 · Frontend http://localhost:3000 · Chroma http://localhost:8000  
 
 If the frontend shows "webhook is not registered", turn the workflow **Active** in n8n (top-right toggle). See [NEXT_STEPS.md](NEXT_STEPS.md) for more detail and troubleshooting.
 
@@ -33,18 +33,18 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
 ```
 ┌─────────────┐     PDF + query      ┌─────────────┐     { text, query }     ┌──────────────────────────────────────────────────────────┐
 │  Frontend   │ ──────────────────► │   Backend   │ ─────────────────────► │  n8n workflow (Document Reviewer with RAG)                │
-│  (React)    │                     │  (Express)  │                         │  Webhook → Chunk → Embed (Ollama) → Chroma → Retrieve   │
+│  (React)    │                     │  (Express)  │                         │  Webhook → Chunk → Embed (Gemini) → Chroma → Retrieve   │
 └─────────────┘                     └─────────────┘                         │  → Build context → Groq LLM → Respond                    │
        │                                    │                                └──────────────────────────────────────────────────────────┘
        │                                    │  pdf-parse                                              │
        │                                    ▼                                                          │
        │                             Extracts text from PDF                                            ▼
-       └──────────────────────────── Response: { answer } ◄──────────────────────────────────── Chroma (8000) + Ollama (11434) + Groq
+       └──────────────────────────── Response: { answer } ◄──────────────────────────────────── Chroma (8000) + Google Gemini API + Groq
 ```
 
 - **Frontend:** Upload PDF, enter query, call backend `/analyze`, display the answer.
 - **Backend:** Receives PDF + query, extracts text with `pdf-parse`, POSTs `{ text, query }` to the n8n webhook, returns the result to the frontend.
-- **n8n workflow:** Receives `{ text, query }`, chunks the text, embeds chunks with Ollama, inserts into Chroma, embeds the query, retrieves top-k chunks from Chroma, builds a context prompt, and calls Groq to generate `{ answer }`. Same webhook contract: input `{ text, query }`, output `{ answer }`.
+- **n8n workflow:** Receives `{ text, query }`, chunks the text, embeds chunks with Google Gemini (`gemini-embedding-001`), inserts into Chroma, embeds the query, retrieves top-k chunks from Chroma, builds a context prompt, and calls Groq to generate `{ answer }`. Same webhook contract: input `{ text, query }`, output `{ answer }`.
 
 ---
 
@@ -52,7 +52,7 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
 
 | Path | Description |
 |------|-------------|
-| **`n8n-workflow-document-reviewer.json`** | **Main n8n workflow** — RAG pipeline: Webhook → Extract Body → Chunk Text → Ollama Embed → Chroma Add → Chroma Query → Build Prompt → Groq Generate → Respond to Webhook. |
+| **`n8n-workflow-document-reviewer.json`** | **Main n8n workflow** — RAG pipeline: Webhook → Extract Body → Chunk Text → Google Embed (Gemini) → Chroma Add → Chroma Query → Build Prompt → Groq Generate → Respond to Webhook. |
 | **`scripts/`** | Helper scripts: `start-n8n-docker.ps1`, `health-check.ps1`, `test-workflow.ps1`, `setup_chroma.py`, and others. Run from project root (e.g. `.\scripts\start-n8n-docker.ps1`). |
 | **`docs/`** | All guides: setup, n8n workflow, Groq, Ollama troubleshooting, Chroma, Vercel. |
 | **`ai-doc-backend/`** | Express backend: PDF upload, text extraction, proxy to n8n webhook. |
@@ -72,11 +72,11 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
 | **Backend** | `ai-doc-backend/` |
 | **Frontend** | `frontend/` |
 | **Backend env** | `ai-doc-backend/.env` (copy from `.env.example`) |
-| **Chroma + Ollama (RAG)** | `scripts/start-chroma.ps1`, `scripts/setup_chroma.py`, Ollama with `nomic-embed-text` — required for the RAG workflow. See [docs/RAG_SETUP.md](docs/RAG_SETUP.md). |
+| **Chroma + Gemini (RAG)** | `scripts/start-chroma.ps1`, `scripts/setup_chroma.py`, and a [Gemini API key](https://aistudio.google.com/apikey) for `gemini-embedding-001` — required for the RAG workflow. See [docs/RAG_SETUP.md](docs/RAG_SETUP.md). |
 
 **Optional reading:**
 
-- **`docs/OLLAMA_FIX.md`** — Ollama troubleshooting.
+- **`docs/OLLAMA_FIX.md`** — Ollama troubleshooting (if you switch back to local embeddings).
 
 The **correct and final** workflow file is **`n8n-workflow-document-reviewer.json`** (webhook path: `document-review`, uses Groq).
 
@@ -134,34 +134,34 @@ The **document reviewer** is implemented as an n8n workflow with a **full RAG pi
 1. **Webhook** — Receives `POST` with JSON: `{ "text": "<full document text>", "query": "<user question>" }`.
 2. **Extract Body** — Validates and normalizes `text` and `query`; generates a per-request `documentId` for Chroma metadata.
 3. **Chunk Text** — Splits the document into chunks (~1000 chars, 200 overlap).
-4. **Ollama Embed Chunks** — Embeds each chunk with `nomic-embed-text` (Ollama on port 11434).
+4. **Google Embed Chunks** — Embeds each chunk with Google Gemini `gemini-embedding-001` (Gemini API / Google AI Studio).
 5. **Merge Chunk + Embed** — Combines chunk text and embeddings for Chroma.
 6. **Build Chroma Add** / **Chroma Add** — Inserts chunk embeddings into Chroma collection `documents` with metadata `documentId`.
 7. **Pass Query + DocId** — Forwards `query` and `documentId` for retrieval.
-8. **Ollama Embed Query** — Embeds the user query.
+8. **Google Embed Query** — Embeds the user query with Gemini.
 9. **Build Chroma Query** / **Chroma Query** — Retrieves top-5 chunks from Chroma filtered by `documentId`.
 10. **Build Groq Prompt** — Builds a prompt from retrieved context + query.
 11. **Groq Generate** — Calls Groq LLM; **Respond to Webhook** returns `{ "answer": "..." }`.
 
-The frontend and backend contract is unchanged: **input** `{ text, query }`, **output** `{ answer }`. Chroma and Ollama must be running; see [docs/RAG_SETUP.md](docs/RAG_SETUP.md) for setup and troubleshooting.
+The frontend and backend contract is unchanged: **input** `{ text, query }`, **output** `{ answer }`. Chroma must be running and you need a Gemini API key; see [docs/RAG_SETUP.md](docs/RAG_SETUP.md) for setup and troubleshooting.
 
 ---
 
 ## Services Reference
 
-| Service   | Port  | Purpose |
-|----------|-------|--------|
-| Frontend | 3000  | React UI |
-| Backend  | 5000  | PDF parsing, n8n proxy |
-| n8n      | 5678  | Workflow engine, webhook |
-| Ollama   | 11434 | Embeddings for RAG (`nomic-embed-text`) |
-| Chroma   | 8000  | Vector store for RAG (collection `documents`) |
+| Service   | Port / API | Purpose |
+|----------|------------|--------|
+| Frontend | 3000       | React UI |
+| Backend  | 5000       | PDF parsing, n8n proxy |
+| n8n      | 5678       | Workflow engine, webhook |
+| Chroma   | 8000       | Vector store for RAG (collection `documents`) |
+| Google Gemini | API key | Embeddings for RAG (`gemini-embedding-001`) |
 
 ---
 
 ## Documentation
 
-- **[docs/RAG_SETUP.md](docs/RAG_SETUP.md)** — RAG prerequisites: Chroma, Ollama embeddings, chunking, and troubleshooting.
+- **[docs/RAG_SETUP.md](docs/RAG_SETUP.md)** — RAG prerequisites: Chroma, Google Gemini embeddings, chunking, and troubleshooting.
 - **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — Full setup, Chroma, health checks, troubleshooting.
 - **[docs/N8N_WORKFLOW_GUIDE.md](docs/N8N_WORKFLOW_GUIDE.md)** — Contract, workflow details, frontend/backend options.
 - **[docs/N8N_STEP_BY_STEP_WORKFLOW.md](docs/N8N_STEP_BY_STEP_WORKFLOW.md)** — Building the workflow node-by-node in n8n.

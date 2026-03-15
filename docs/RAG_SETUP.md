@@ -1,6 +1,6 @@
 # RAG Setup — Document Reviewer
 
-This guide covers the **Retrieval-Augmented Generation (RAG)** pipeline used by the n8n Document Reviewer workflow: chunking, embeddings (Ollama), Chroma vector store, and troubleshooting.
+This guide covers the **Retrieval-Augmented Generation (RAG)** pipeline used by the n8n Document Reviewer workflow: chunking, embeddings (Google Gemini), Chroma vector store, and troubleshooting.
 
 ---
 
@@ -9,7 +9,7 @@ This guide covers the **Retrieval-Augmented Generation (RAG)** pipeline used by 
 The workflow:
 
 1. **Chunks** the document text (~1000 characters, 200 overlap).
-2. **Embeds** each chunk with Ollama (`nomic-embed-text`).
+2. **Embeds** each chunk with Google Gemini (`gemini-embedding-001` via Gemini API / Google AI Studio free tier).
 3. **Stores** embeddings in Chroma (collection `documents`) with metadata `documentId` per request.
 4. **Embeds** the user query and **retrieves** top-5 chunks from Chroma filtered by `documentId`.
 5. **Builds** a prompt from retrieved context and sends it to **Groq** for the final answer.
@@ -20,11 +20,11 @@ Same webhook contract: **input** `{ text, query }`, **output** `{ answer }`.
 
 ## Prerequisites
 
-| Service   | Port  | Purpose |
-|----------|-------|--------|
-| **Chroma** | 8000  | Vector store; collection name `documents`. |
-| **Ollama** | 11434 | Embeddings model `nomic-embed-text`. |
-| **Groq**  | API   | LLM for generation (API key in n8n). |
+| Service        | Port / API | Purpose |
+|----------------|------------|--------|
+| **Chroma**     | 8000       | Vector store; collection name `documents`. |
+| **Google Gemini** | API key | Embeddings model `gemini-embedding-001` (free tier at [Google AI Studio](https://aistudio.google.com/apikey)). |
+| **Groq**       | API key    | LLM for generation (in n8n). |
 
 ---
 
@@ -48,22 +48,19 @@ If your Chroma API uses a **collection ID** (UUID) instead of the name `document
 
 ---
 
-## Ollama (embeddings)
+## Google Gemini (embeddings)
 
-1. **Install Ollama:** https://ollama.com
+1. **Get an API key:** Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API key. The free tier supports the `gemini-embedding-001` embedding model.
 
-2. **Pull the embedding model:**
-   ```bash
-   ollama pull nomic-embed-text
-   ```
+2. **Configure the workflow:** In n8n, open the **Google Embed Chunks** and **Google Embed Query** nodes. Set the `x-goog-api-key` header to your Gemini API key (replace `YOUR_GEMINI_API_KEY`).
 
-3. **Ensure Ollama is running** (default: http://localhost:11434).
+3. **API details:**
+   - **Endpoint:** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent`
+   - **Header:** `x-goog-api-key: <your-api-key>`
+   - **Request body:** `{ "model": "models/gemini-embedding-001", "content": { "parts": [{ "text": "<text to embed>" }] } }`
+   - **Response:** `{ "embedding": { "values": [ ... array of 3072 floats ... ] } }`
 
-The workflow uses **POST** to `http://localhost:11434/api/embeddings` with body:
-- `model`: `nomic-embed-text`
-- `prompt`: chunk text or query text
-
-If your Ollama version uses the newer **embed** API (`/api/embed` with `input` instead of `prompt`), update the **Ollama Embed Chunks** and **Ollama Embed Query** nodes: set URL to `http://localhost:11434/api/embed` and send `{ "model": "nomic-embed-text", "input": "..." }`. The **Build Chroma Add** and **Build Chroma Query** nodes accept both `embedding` and `embeddings[0]` from the response.
+The workflow reads `embedding.values` from the response and uses it for Chroma add/query. No local server is required; everything runs over HTTPS.
 
 ---
 
@@ -71,14 +68,15 @@ If your Ollama version uses the newer **embed** API (`/api/embed` with `input` i
 
 - **Chunk size:** 1000 characters (configurable in the **Chunk Text** Code node).
 - **Overlap:** 200 characters to keep context across boundaries.
-- **Model limit:** `nomic-embed-text` has a 2k token limit; 1000 chars is safe. If you see embedding errors, reduce chunk size (e.g. 500).
+- **Model limit:** `gemini-embedding-001` supports long inputs (e.g. up to 2,048 tokens per request); 1000 chars per chunk is safe. If you see errors, reduce chunk size (e.g. 500).
 
 ---
 
 ## Embedding options (alternatives)
 
-- **Ollama (default):** Local, free; use `nomic-embed-text` or `all-minilm`.
-- **OpenAI:** Replace the Ollama HTTP nodes with requests to OpenAI embeddings and use the same Chroma add/query payloads. You would need to add an OpenAI API key and adjust the workflow nodes accordingly.
+- **Google Gemini (default):** Free tier via Google AI Studio; model `gemini-embedding-001` (3,072 dimensions).
+- **Ollama:** For fully local embeddings, replace the Google HTTP nodes with Ollama (`http://localhost:11434/api/embeddings`, model `nomic-embed-text`) and adjust the Build Chroma Add / Build Chroma Query code to use `embedding` (array) instead of `embedding.values`.
+- **OpenAI:** Replace with OpenAI embeddings API and use the same Chroma add/query payloads (add API key and node configuration).
 
 ---
 
@@ -86,9 +84,9 @@ If your Ollama version uses the newer **embed** API (`/api/embed` with `input` i
 
 | Issue | Check |
 |-------|--------|
-| "No embeddings received from Ollama" | Ollama running on 11434; `ollama pull nomic-embed-text`; correct URL in **Ollama Embed Chunks** / **Ollama Embed Query**. |
+| "No embeddings received from Gemini" | Valid Gemini API key in **Google Embed Chunks** / **Google Embed Query** (`x-goog-api-key` header); key has access to Embedding API; request body uses `content.parts[].text`. |
 | Chroma add/query fails | Chroma running on 8000; collection `documents` exists (`python scripts/setup_chroma.py`); correct collection name or id in node URLs. |
-| "Query embedding missing" | Merge node **Merge Query + Embed** must receive both Pass Query + DocId output (query, documentId) and Ollama Embed Query output (embedding). Check connections. |
+| "Query embedding missing" | Merge node **Merge Query + Embed** must receive both Pass Query + DocId output (query, documentId) and Google Embed Query output (embedding with `values`). Check connections. |
 | Empty or poor answers | Increase **n_results** in **Build Chroma Query** (e.g. 8); or check that chunks and query are embedded with the same model. |
 
 ---

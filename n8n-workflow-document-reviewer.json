@@ -37,18 +37,25 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:11434/api/embeddings",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-goog-api-key", "value": "YOUR_GEMINI_API_KEY" }
+          ]
+        },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: 'nomic-embed-text', prompt: $json.pageContent }) }}",
+        "body": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.pageContent }] } }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [900, 200],
-      "id": "ollama-embed-chunks",
-      "name": "Ollama Embed Chunks"
+      "id": "google-embed-chunks",
+      "name": "Google Embed Chunks"
     },
     {
       "parameters": {
@@ -64,7 +71,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build Chroma add payload from all chunk+embed items (Merge output)\nconst items = $input.all();\nconst extractBody = $('Extract Body').first().json;\nconst documentId = extractBody.documentId;\n\nconst ids = [];\nconst embeddings = [];\nconst metadatas = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const embedding = item.embedding ?? (item.embeddings && item.embeddings[0]);\n  const docId = item.documentId ?? documentId;\n  if (Array.isArray(embedding)) {\n    ids.push(`${docId}-${i}`);\n    embeddings.push(embedding);\n    metadatas.push({ documentId: docId });\n  }\n}\n\nif (ids.length === 0) throw new Error('No embeddings received from Ollama');\n\nreturn [{ json: { ids, embeddings, metadatas, documentId } }];"
+        "jsCode": "// Build Chroma add payload from all chunk+embed items (Merge output)\nconst items = $input.all();\nconst extractBody = $('Extract Body').first().json;\nconst documentId = extractBody.documentId;\n\nconst ids = [];\nconst embeddings = [];\nconst metadatas = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const raw = item.embedding ?? (item.embeddings && item.embeddings[0]);\n  const embedding = raw?.values ?? (Array.isArray(raw) ? raw : null);\n  const docId = item.documentId ?? documentId;\n  if (Array.isArray(embedding)) {\n    ids.push(`${docId}-${i}`);\n    embeddings.push(embedding);\n    metadatas.push({ documentId: docId });\n  }\n}\n\nif (ids.length === 0) throw new Error('No embeddings received from Gemini');\n\nreturn [{ json: { ids, embeddings, metadatas, documentId } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -107,22 +114,29 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:11434/api/embeddings",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-goog-api-key", "value": "YOUR_GEMINI_API_KEY" }
+          ]
+        },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: 'nomic-embed-text', prompt: $json.query }) }}",
+        "body": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.query }] } }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1780, 200],
-      "id": "ollama-embed-query",
-      "name": "Ollama Embed Query"
+      "id": "google-embed-query",
+      "name": "Google Embed Query"
     },
     {
       "parameters": {
-        "jsCode": "// Build Chroma query payload from merged item (query, documentId, embedding)\nconst m = $input.first().json;\nconst query = m.query;\nconst documentId = m.documentId;\nconst queryEmbedding = m.embedding ?? (m.embeddings && m.embeddings[0]);\n\nif (!Array.isArray(queryEmbedding)) throw new Error('Query embedding missing');\n\nconst chromaQueryBody = {\n  query_embeddings: [queryEmbedding],\n  n_results: 5,\n  where: { documentId }\n};\n\nreturn [{ json: { chromaQueryBody, query } }];"
+        "jsCode": "// Build Chroma query payload from merged item (query, documentId, embedding)\nconst m = $input.first().json;\nconst query = m.query;\nconst documentId = m.documentId;\nconst raw = m.embedding ?? (m.embeddings && m.embeddings[0]);\nconst queryEmbedding = raw?.values ?? (Array.isArray(raw) ? raw : null);\n\nif (!Array.isArray(queryEmbedding)) throw new Error('Query embedding missing');\n\nconst chromaQueryBody = {\n  query_embeddings: [queryEmbedding],\n  n_results: 5,\n  where: { documentId }\n};\n\nreturn [{ json: { chromaQueryBody, query } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -220,10 +234,10 @@
     "Chunk Text": {
       "main": [[
         { "node": "Merge Chunk + Embed", "type": "main", "index": 0 },
-        { "node": "Ollama Embed Chunks", "type": "main", "index": 0 }
+        { "node": "Google Embed Chunks", "type": "main", "index": 0 }
       ]]
     },
-    "Ollama Embed Chunks": {
+    "Google Embed Chunks": {
       "main": [[{ "node": "Merge Chunk + Embed", "type": "main", "index": 1 }]]
     },
     "Merge Chunk + Embed": {
@@ -243,11 +257,11 @@
     },
     "Pass Query + DocId": {
       "main": [
-        [{ "node": "Ollama Embed Query", "type": "main", "index": 0 }],
+        [{ "node": "Google Embed Query", "type": "main", "index": 0 }],
         [{ "node": "Merge Query + Embed", "type": "main", "index": 0 }]
       ]
     },
-    "Ollama Embed Query": {
+    "Google Embed Query": {
       "main": [
         [{ "node": "Merge Query + Embed", "type": "main", "index": 1 }]
       ]
