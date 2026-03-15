@@ -62,12 +62,12 @@ Access n8n at: http://localhost:5678
 
 ```bash
 # From project root
-python setup_chroma.py
+python scripts/setup_chroma.py
 ```
 
 Or using the venv Python:
 ```bash
-n8n\venv\Scripts\python.exe setup_chroma.py
+n8n\venv\Scripts\python.exe scripts/setup_chroma.py
 ```
 
 ### Option B: Using Postman
@@ -150,7 +150,7 @@ http://localhost:5678/webhook/document-analysis
 ### Option A: Using PowerShell Script
 
 ```powershell
-.\test-workflow.ps1
+.\scripts\test-workflow.ps1
 ```
 
 Enter your webhook URL when prompted.
@@ -202,7 +202,7 @@ Enter your webhook URL when prompted.
 Run the comprehensive health check:
 
 ```powershell
-.\health-check.ps1
+.\scripts\health-check.ps1
 ```
 
 Or manually check each service:
@@ -240,7 +240,7 @@ Invoke-WebRequest -Uri http://localhost:3000 -UseBasicParsing
 
 ### If you get Chroma errors:
 
-1. ✅ Collection may not exist - run `setup_chroma.py`
+1. ✅ Collection may not exist - run `python scripts/setup_chroma.py`
 2. ✅ Check Chroma is running on port 8000
 3. ✅ Verify API version compatibility
 
@@ -256,7 +256,7 @@ JSON.parse($json.response)
 1. ✅ Start Ollama (`ollama serve`)
 2. ✅ Start Chroma (`chroma run --host localhost --port 8000`)
 3. ✅ Start n8n (`n8n start`)
-4. ✅ Create Chroma collection (one-time: `python setup_chroma.py`)
+4. ✅ Create Chroma collection (one-time: `python scripts/setup_chroma.py`)
 5. ✅ Get n8n webhook URL
 6. ✅ Test workflow via Postman or Frontend
 
@@ -272,11 +272,11 @@ JSON.parse($json.response)
 
 ## Scripts Available
 
-- `setup_chroma.py` - Create Chroma collection
-- `health-check.ps1` - Check all services
-- `test-workflow.ps1` - Test n8n workflow
-- `start-all-services.ps1` - Start all services
-- `check-services.ps1` - Quick service status
+- `scripts/setup_chroma.py` - Create Chroma collection
+- `scripts/health-check.ps1` - Check all services
+- `scripts/test-workflow.ps1` - Test n8n workflow
+- `scripts/start-all-services.ps1` - Start all services
+- `scripts/check-services.ps1` - Quick service status
 
 
 

@@ -1,4 +1,6 @@
-# Start All Services Script
+# Start All Services Script (run from project root: .\scripts\start-all-services.ps1)
+$ProjectRoot = Split-Path $PSScriptRoot -Parent
+
 Write-Host "`n=== Starting Full Stack Services ===" -ForegroundColor Cyan
 Write-Host ""
 
@@ -9,19 +11,19 @@ Start-Sleep -Seconds 2
 
 # Start Backend
 Write-Host "Starting Backend (port 5000)..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd D:\automationChallenge2\ai-doc-backend; Write-Host 'Backend Server Starting...' -ForegroundColor Cyan; npm start"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot\ai-doc-backend'; Write-Host 'Backend Server Starting...' -ForegroundColor Cyan; npm start"
 
 Start-Sleep -Seconds 3
 
 # Start n8n
 Write-Host "Starting n8n (port 5678)..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd D:\automationChallenge2\n8n; Write-Host 'n8n Starting...' -ForegroundColor Cyan; npx n8n"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot\n8n'; Write-Host 'n8n Starting...' -ForegroundColor Cyan; npx n8n"
 
 Start-Sleep -Seconds 3
 
 # Start Frontend
 Write-Host "Starting Frontend (port 3000)..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd D:\automationChallenge2\frontend; Write-Host 'Frontend Starting...' -ForegroundColor Cyan; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot\frontend'; Write-Host 'Frontend Starting...' -ForegroundColor Cyan; npm run dev"
 
 Write-Host ""
 Write-Host "All services started in separate windows." -ForegroundColor Green

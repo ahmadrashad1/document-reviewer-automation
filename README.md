@@ -31,12 +31,11 @@
 | Path | Description |
 |------|-------------|
 | **`n8n-workflow-document-reviewer.json`** | **Main n8n workflow** — import this into n8n. Webhook → Extract Body → Groq Generate → Respond to Webhook. |
-| **`n8n/`** | n8n-related assets: `package.json` (for running n8n), Chroma persistence data (when using RAG). |
+| **`scripts/`** | Helper scripts: `start-n8n-docker.ps1`, `health-check.ps1`, `test-workflow.ps1`, `setup_chroma.py`, and others. Run from project root (e.g. `.\scripts\start-n8n-docker.ps1`). |
+| **`docs/`** | All guides: setup, n8n workflow, Groq, Ollama troubleshooting, Chroma, Vercel. |
 | **`ai-doc-backend/`** | Express backend: PDF upload, text extraction, proxy to n8n webhook. |
 | **`frontend/`** | React (Vite) UI: file upload, query input, results display. |
-| **`docs/`** | Guides: n8n workflow, step-by-step build, Groq setup, HTTP/raw body fixes. |
-| **`setup_chroma.py`** | One-time script to create the Chroma `documents` collection (for RAG). |
-| **`archive/n8n-snippets/`** | Archived RAG snippets and debug notes (`n8n-*.js`, `n8n-*.md`, old `My workflow.json`). Reference only. |
+| **`n8n/`** | n8n-related assets: `package.json`, Chroma persistence data (when using RAG). |
 
 ---
 
@@ -50,12 +49,11 @@
 | **Backend** | `ai-doc-backend/` |
 | **Frontend** | `frontend/` |
 | **Backend env** | `ai-doc-backend/.env` (copy from `.env.example`) |
-| **Optional: Chroma setup** | `setup_chroma.py` (only if you add RAG with Chroma) |
+| **Optional: Chroma setup** | `scripts/setup_chroma.py` (only if you add RAG with Chroma) |
 
-**Extra / not needed to run the app (moved to `archive/n8n-snippets/`):**
+**Optional reading:**
 
-- **`archive/n8n-snippets/`** — Code snippets (`n8n-*.js`) and fix/debug notes (`n8n-*.md`) from building the RAG pipeline, plus the old **`My workflow.json`** (path `document-analysis`). Reference only; the app does not use them.
-- **`OLLAMA_FIX.md`** (root) — Troubleshooting notes. Optional reading.
+- **`docs/OLLAMA_FIX.md`** — Ollama troubleshooting.
 
 The **correct and final** workflow file is **`n8n-workflow-document-reviewer.json`** (webhook path: `document-review`, uses Groq).
 
@@ -78,7 +76,7 @@ The **correct and final** workflow file is **`n8n-workflow-document-reviewer.jso
    ```bash
    docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest
    ```
-   Or run the script: `.\start-n8n-docker.ps1`  
+   Or run: `.\scripts\start-n8n-docker.ps1`  
    **Important:** You must use `-p 5678:5678` so the editor is reachable at **http://localhost:5678**. Without it, the container has port 5678 only inside Docker, so the browser shows nothing.
 
    **Option B – Local (no Docker):**
@@ -89,7 +87,7 @@ The **correct and final** workflow file is **`n8n-workflow-document-reviewer.jso
 
 4. **Import the workflow** in n8n:
    - **Workflows** → **Import from File**
-   - Select **`n8n-workflow-document-reviewer.json`** from the project root (not `My workflow.json`).
+   - Select **`n8n-workflow-document-reviewer.json`** from the project root.
    - In the **Groq Generate** node, set **Authorization** to `Bearer YOUR_GROQ_API_KEY` ([docs/GROQ_SETUP.md](docs/GROQ_SETUP.md)).
    - **Save** and **Activate**.
    - Copy the **Production** webhook URL: `http://localhost:5678/webhook/document-review`.
@@ -113,7 +111,7 @@ The **correct and final** workflow file is **`n8n-workflow-document-reviewer.jso
 8. **Use the app**  
    Open **http://localhost:3000** → upload a PDF → enter a question → **Analyze Document**. Results come from the n8n workflow.
 
-**Summary:** The “final project” = **frontend** (port 3000) + **backend** (5000) + **n8n** (5678) with **`n8n-workflow-document-reviewer.json`** imported and active. Extra snippet/debug files live in **archive/n8n-snippets/**.
+**Summary:** The “final project” = **frontend** (port 3000) + **backend** (5000) + **n8n** (5678) with **`n8n-workflow-document-reviewer.json`** imported and active.
 
 ---
 
@@ -142,7 +140,7 @@ For very long documents, the docs describe an extended pipeline:
 6. Call the LLM with context + query.
 7. Respond with `{ answer }`.
 
-The files in `archive/n8n-snippets/` (merge, chroma, fix/solution docs) are references for building or debugging that RAG chain in n8n. The **importable workflow** (`n8n-workflow-document-reviewer.json`) is the **simple** path (no Chroma); you can extend it using the RAG steps in the guides.
+The **importable workflow** (`n8n-workflow-document-reviewer.json`) is the **simple** path (no Chroma). You can extend it with a full RAG chain using the steps in **docs/N8N_WORKFLOW_GUIDE.md** (Section 4).
 
 ---
 
@@ -207,8 +205,8 @@ cd frontend && npm run dev
 If you add the RAG pipeline in n8n:
 
 1. Install and start Chroma (e.g. `pip install chromadb` then `chroma run --host localhost --port 8000` from the `n8n` folder or a venv).
-2. Create the collection: `python setup_chroma.py` (with Chroma running).
-3. Build the chunk → embed → Chroma → query → LLM flow in n8n using the steps in **docs/N8N_WORKFLOW_GUIDE.md** (Section 4) and the helper code in **archive/n8n-snippets/**.
+2. Create the collection: `python scripts/setup_chroma.py` (with Chroma running).
+3. Build the chunk → embed → Chroma → query → LLM flow in n8n using the steps in **docs/N8N_WORKFLOW_GUIDE.md** (Section 4).
 
 ---
 
@@ -226,10 +224,11 @@ If you add the RAG pipeline in n8n:
 
 ## Documentation
 
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** — Full setup, Chroma, health checks, troubleshooting.
+- **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — Full setup, Chroma, health checks, troubleshooting.
 - **[docs/N8N_WORKFLOW_GUIDE.md](docs/N8N_WORKFLOW_GUIDE.md)** — Contract, simple workflow, optional RAG, frontend/backend options.
 - **[docs/N8N_STEP_BY_STEP_WORKFLOW.md](docs/N8N_STEP_BY_STEP_WORKFLOW.md)** — Building the workflow node-by-node in n8n.
 - **[docs/GROQ_SETUP.md](docs/GROQ_SETUP.md)** — Groq API key and model configuration.
+- **[scripts/README.md](scripts/README.md)** — List of helper scripts and how to run them.
 
 ---
 
