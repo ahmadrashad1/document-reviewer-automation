@@ -1,5 +1,5 @@
 {
-  "name": "Document Reviewer (Simple)",
+  "name": "Document Reviewer (RAG)",
   "nodes": [
     {
       "parameters": {
@@ -16,13 +16,163 @@
     },
     {
       "parameters": {
-        "jsCode": "// Normalize input and build Groq (OpenAI-compatible) chat body\nconst raw = $input.first().json;\nconst body = raw.body ?? raw;\nconst text = body.text ?? body.documentText ?? '';\nconst query = body.query ?? '';\n\nif (!text || !query) {\n  throw new Error('Request body must include \"text\" and \"query\"');\n}\n\nconst prompt = 'You are a document analyst. Use only the following document text to answer the question. If the answer is not in the text, say so.\\n\\nDocument text:\\n' + text + '\\n\\nQuestion: ' + query + '\\n\\nAnswer (concise, plain text):';\n\nconst groqBody = {\n  model: 'llama-3.1-8b-instant',\n  messages: [{ role: 'user', content: prompt }],\n  max_tokens: 2048,\n  temperature: 0.3\n};\nconst groqBodyJson = JSON.stringify(groqBody);\n\nreturn [{ json: { text, query, groqBody, groqBodyJson } }];"
+        "jsCode": "// Normalize input, generate documentId for RAG scope\nconst raw = $input.first().json;\nconst body = raw.body ?? raw;\nconst text = (body.text ?? body.documentText ?? '').trim();\nconst query = (body.query ?? '').trim();\n\nif (!text || !query) {\n  throw new Error('Request body must include \"text\" and \"query\"');\n}\n\n// Per-request documentId for Chroma metadata (isolate this document's chunks)\nconst documentId = body.documentId || `doc-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;\n\nreturn [{ json: { text, query, documentId } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 300],
       "id": "extract-body",
       "name": "Extract Body"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chunk text: ~1000 chars, 200 overlap (Recursive Character style)\nconst CHUNK_SIZE = 1000;\nconst CHUNK_OVERLAP = 200;\nconst input = $input.first().json;\nconst text = input.text;\nconst documentId = input.documentId;\n\nconst chunks = [];\nlet start = 0;\nwhile (start < text.length) {\n  const end = Math.min(start + CHUNK_SIZE, text.length);\n  let chunk = text.slice(start, end);\n  if (end < text.length && CHUNK_OVERLAP > 0) {\n    const lastSpace = chunk.lastIndexOf(' ', chunk.length - CHUNK_OVERLAP);\n    if (lastSpace > 0) chunk = chunk.slice(0, lastSpace + 1);\n  }\n  if (chunk.trim()) chunks.push({ pageContent: chunk.trim(), documentId });\n  start = start + chunk.length - (end < text.length ? CHUNK_OVERLAP : 0);\n}\n\nif (chunks.length === 0) chunks.push({ pageContent: text.slice(0, 2000) || '(empty)', documentId });\n\nreturn chunks.map((c, i) => ({ json: { ...c, chunkIndex: i } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 200],
+      "id": "chunk-text",
+      "name": "Chunk Text"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/embeddings",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'nomic-embed-text', prompt: $json.pageContent }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "id": "ollama-embed-chunks",
+      "name": "Ollama Embed Chunks"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [900, 380],
+      "id": "merge-chunk-embed",
+      "name": "Merge Chunk + Embed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Chroma add payload from all chunk+embed items (Merge output)\nconst items = $input.all();\nconst extractBody = $('Extract Body').first().json;\nconst documentId = extractBody.documentId;\n\nconst ids = [];\nconst embeddings = [];\nconst metadatas = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const embedding = item.embedding ?? (item.embeddings && item.embeddings[0]);\n  const docId = item.documentId ?? documentId;\n  if (Array.isArray(embedding)) {\n    ids.push(`${docId}-${i}`);\n    embeddings.push(embedding);\n    metadatas.push({ documentId: docId });\n  }\n}\n\nif (ids.length === 0) throw new Error('No embeddings received from Ollama');\n\nreturn [{ json: { ids, embeddings, metadatas, documentId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "id": "build-chroma-add",
+      "name": "Build Chroma Add"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/collections/documents/add",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ ids: $json.ids, embeddings: $json.embeddings, metadatas: $json.metadatas }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "id": "chroma-add",
+      "name": "Chroma Add"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass query and documentId for retrieval\nconst extractBody = $('Extract Body').first().json;\nreturn [{ json: { query: extractBody.query, documentId: extractBody.documentId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300],
+      "id": "pass-query-docid",
+      "name": "Pass Query + DocId"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/embeddings",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'nomic-embed-text', prompt: $json.query }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200],
+      "id": "ollama-embed-query",
+      "name": "Ollama Embed Query"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Chroma query payload from merged item (query, documentId, embedding)\nconst m = $input.first().json;\nconst query = m.query;\nconst documentId = m.documentId;\nconst queryEmbedding = m.embedding ?? (m.embeddings && m.embeddings[0]);\n\nif (!Array.isArray(queryEmbedding)) throw new Error('Query embedding missing');\n\nconst chromaQueryBody = {\n  query_embeddings: [queryEmbedding],\n  n_results: 5,\n  where: { documentId }\n};\n\nreturn [{ json: { chromaQueryBody, query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 400],
+      "id": "build-chroma-query",
+      "name": "Build Chroma Query"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2000, 300],
+      "id": "merge-query-embed",
+      "name": "Merge Query + Embed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/collections/documents/query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.chromaQueryBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 300],
+      "id": "chroma-query",
+      "name": "Chroma Query"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Groq prompt from retrieved chunks\nconst chromaResponse = $input.first().json;\nconst query = $('Pass Query + DocId').first().json.query;\n\nconst documents = chromaResponse.documents || chromaResponse.data?.documents;\nconst arr = Array.isArray(documents) ? documents[0] : [];\nconst context = (arr && arr.length) ? arr.join('\\n\\n---\\n\\n') : '(No relevant sections found.)';\n\nconst prompt = `You are a document analyst. Use only the following context from the document to answer the question. If the answer is not in the context, say so.\n\nContext:\n${context}\n\nQuestion: ${query}\n\nAnswer (concise, plain text):`;\n\nconst groqBody = {\n  model: 'llama-3.1-8b-instant',\n  messages: [{ role: 'user', content: prompt }],\n  max_tokens: 2048,\n  temperature: 0.3\n};\n\nreturn [{ json: { groqBodyJson: JSON.stringify(groqBody) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 300],
+      "id": "build-groq-prompt",
+      "name": "Build Groq Prompt"
     },
     {
       "parameters": {
@@ -43,7 +193,7 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [680, 300],
+      "position": [2660, 300],
       "id": "groq-generate",
       "name": "Groq Generate"
     },
@@ -55,7 +205,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [900, 300],
+      "position": [2880, 300],
       "id": "respond-webhook",
       "name": "Respond to Webhook"
     }
@@ -65,10 +215,67 @@
       "main": [[{ "node": "Extract Body", "type": "main", "index": 0 }]]
     },
     "Extract Body": {
-      "main": [[{ "node": "Groq Generate", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Chunk Text", "type": "main", "index": 0 }]]
+    },
+    "Chunk Text": {
+      "main": [[
+        { "node": "Merge Chunk + Embed", "type": "main", "index": 0 },
+        { "node": "Ollama Embed Chunks", "type": "main", "index": 0 }
+      ]]
+    },
+    "Ollama Embed Chunks": {
+      "main": [[{ "node": "Merge Chunk + Embed", "type": "main", "index": 1 }]]
+    },
+    "Merge Chunk + Embed": {
+      "main": [
+        [{ "node": "Build Chroma Add", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Chroma Add": {
+      "main": [
+        [{ "node": "Chroma Add", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chroma Add": {
+      "main": [
+        [{ "node": "Pass Query + DocId", "type": "main", "index": 0 }]
+      ]
+    },
+    "Pass Query + DocId": {
+      "main": [
+        [{ "node": "Ollama Embed Query", "type": "main", "index": 0 }],
+        [{ "node": "Merge Query + Embed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ollama Embed Query": {
+      "main": [
+        [{ "node": "Merge Query + Embed", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge Query + Embed": {
+      "main": [
+        [{ "node": "Build Chroma Query", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Chroma Query": {
+      "main": [
+        [{ "node": "Chroma Query", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chroma Query": {
+      "main": [
+        [{ "node": "Build Groq Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Groq Prompt": {
+      "main": [
+        [{ "node": "Groq Generate", "type": "main", "index": 0 }]
+      ]
     },
     "Groq Generate": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
     }
   },
   "active": false,
