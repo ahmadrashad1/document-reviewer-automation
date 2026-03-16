@@ -162,6 +162,7 @@ The frontend and backend contract is unchanged: **input** `{ text, query }`, **o
 
 ## Documentation
 
+- **[docs/N8N_TUTORIAL.md](docs/N8N_TUTORIAL.md)** — Learn n8n by walking through how this project’s workflow was built (nodes, data flow, Merge, HTTP, webhooks).
 - **[docs/RAG_SETUP.md](docs/RAG_SETUP.md)** — RAG prerequisites: Chroma, Google Gemini embeddings, chunking, and troubleshooting.
 - **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — Full setup, Chroma, health checks, troubleshooting.
 - **[docs/N8N_WORKFLOW_GUIDE.md](docs/N8N_WORKFLOW_GUIDE.md)** — Contract, workflow details, frontend/backend options.
