@@ -8,11 +8,11 @@ This guide covers the **Retrieval-Augmented Generation (RAG)** pipeline used by 
 
 The workflow:
 
-1. **Chunks** the document text (~1000 characters, 200 overlap).
+1. **Chunks** the document text with sentence/paragraph-aware boundaries (~800 chars, 120 overlap) for better retrieval.
 2. **Embeds** each chunk with Google Gemini (`gemini-embedding-001` via Gemini API / Google AI Studio free tier).
 3. **Stores** embeddings in Chroma (collection `documents`) with metadata `documentId` per request.
-4. **Embeds** the user query and **retrieves** top-5 chunks from Chroma filtered by `documentId`.
-5. **Builds** a prompt from retrieved context and sends it to **Groq** for the final answer.
+4. **Embeds** the user query and **retrieves** top-10 chunks from Chroma filtered by `documentId`.
+5. **Builds** a strict grounding prompt from retrieved excerpts and sends it to **Groq** (low temperature) for the final answer.
 
 Same webhook contract: **input** `{ text, query }`, **output** `{ answer }`.
 
@@ -97,7 +97,20 @@ The workflow reads `embedding.values` from the response and uses it for Chroma a
 | "No embeddings received from Gemini" | Valid Gemini API key in **Google Embed Chunks** / **Google Embed Query** (`x-goog-api-key` header); key has access to Embedding API; request body uses `content.parts[].text`. |
 | Chroma add/query fails / "service refused connection" | **Chroma must be running** on the host: run `.\scripts\start-chroma-embedded.ps1` (listens on 8010). If n8n runs **in Docker**, the workflow uses `http://host.docker.internal:8010` so the container can reach the host; if n8n runs on the host, change those URLs back to `http://localhost:8010`. |
 | "Query embedding missing" | Merge node **Merge Query + Embed** must receive both Pass Query + DocId output (query, documentId) and Google Embed Query output (embedding with `values`). Check connections. |
-| Empty or poor answers | Increase **n_results** in **Build Chroma Query** (e.g. 8); or check that chunks and query are embedded with the same model. |
+| Empty or poor answers | Increase **n_results** in **Build Chroma Query** (e.g. 12–15); or check that chunks and query are embedded with the same model. See **Accuracy and tuning** below. |
+
+---
+
+## Accuracy and tuning
+
+The workflow is tuned for accuracy:
+
+- **Chunking:** Sentence/paragraph-aware (splits on `\n\n` or `. ` when possible) so chunks don’t cut mid-sentence. Size 800, overlap 120.
+- **Retrieval:** Top-10 chunks (`n_results: 10`) so the LLM has more context; increase to 12–15 if answers still miss context.
+- **Prompt:** Instructions tell the model to answer only from the excerpts, say “The document does not contain this information” when unsure, and not to infer.
+- **Temperature:** 0.15 for more factual, less random answers.
+
+To tune further: edit the **Chunk Text** node (chunk size/overlap), **Build Chroma Query** (`n_results`), or **Build Groq Prompt** (prompt text and `temperature`).
 
 ---
 

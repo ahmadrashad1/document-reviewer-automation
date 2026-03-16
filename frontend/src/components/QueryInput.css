@@ -7,8 +7,8 @@
 .query-label {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: 0.01em;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
 }
 
 .query-input-wrapper {
@@ -26,22 +26,21 @@
   font-family: inherit;
   resize: vertical;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background: var(--color-surface);
+  background: var(--color-bg-elevated);
   color: var(--color-text);
   min-height: 100px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .query-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.12);
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
 }
 
 .query-input:disabled {
-  background: var(--color-bg);
+  opacity: 0.6;
   cursor: not-allowed;
-  opacity: 0.8;
 }
 
 .query-input::placeholder {
@@ -59,15 +58,12 @@
 .query-hint {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 kbd {
-  background: var(--color-bg);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 0.125rem 0.375rem;
   font-size: 0.6875rem;
   font-family: inherit;
@@ -79,20 +75,24 @@ kbd {
   color: #fff;
   border: none;
   border-radius: var(--radius);
-  padding: 0.625rem 1.25rem;
-  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, transform 0.1s ease;
 }
 
 .analyze-button:hover:not(:disabled) {
   background: var(--color-accent-hover);
 }
 
+.analyze-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .analyze-button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -109,15 +109,13 @@ kbd {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .example-queries {
   margin-top: 0.25rem;
   padding: 1rem;
-  background: var(--color-bg);
+  background: var(--color-bg-elevated);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
 }
@@ -142,14 +140,15 @@ kbd {
   padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.875rem;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 
 .example-query:hover:not(:disabled) {
   border-color: var(--color-accent);
-  background: rgba(30, 58, 95, 0.04);
+  background: var(--color-accent-muted);
+  color: var(--color-text);
 }
 
 .example-query:disabled {

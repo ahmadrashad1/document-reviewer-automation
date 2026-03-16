@@ -4,7 +4,7 @@ import './App.css'
 import UploadArea from './components/UploadArea'
 import QueryInput from './components/QueryInput'
 import ResultsDisplay from './components/ResultsDisplay'
-import LoadingSpinner from './components/LoadingSpinner'
+import ProcessSteps from './components/ProcessSteps'
 
 // Browser must reach backend on same host; use env at build time or fallback for dev
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
@@ -128,9 +128,9 @@ function App() {
 
               {isLoading && (
                 <div className="loading-container">
-                  <LoadingSpinner />
+                  <ProcessSteps isActive={true} isComplete={false} />
                   <p className="loading-text">
-                    Analyzing document. This may take a moment.
+                    Analyzing your document — this may take a moment.
                   </p>
                 </div>
               )}
