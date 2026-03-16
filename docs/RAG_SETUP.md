@@ -95,7 +95,7 @@ The workflow reads `embedding.values` from the response and uses it for Chroma a
 |-------|--------|
 | **"Workflow returned no data"** | Backend must call the **production** webhook: `N8N_WEBHOOK_URL=http://localhost:5678/webhook/document-review` in `ai-doc-backend/.env` (use `/webhook/`, not `/webhook-test/`). Workflow must be **Active**. In n8n, open **Executions** and check the latest run for a failed node (e.g. Gemini, Chroma, Groq). |
 | "No embeddings received from Gemini" | Valid Gemini API key in **Google Embed Chunks** / **Google Embed Query** (`x-goog-api-key` header); key has access to Embedding API; request body uses `content.parts[].text`. |
-| Chroma add/query fails | Embedded: Chroma running on 8010 (`.\scripts\start-chroma-embedded.ps1`). Docker: port 8000; run `python scripts/setup_chroma.py` to create collection `documents`. Ensure workflow node URLs use the correct port. |
+| Chroma add/query fails / "service refused connection" | **Chroma must be running** on the host: run `.\scripts\start-chroma-embedded.ps1` (listens on 8010). If n8n runs **in Docker**, the workflow uses `http://host.docker.internal:8010` so the container can reach the host; if n8n runs on the host, change those URLs back to `http://localhost:8010`. |
 | "Query embedding missing" | Merge node **Merge Query + Embed** must receive both Pass Query + DocId output (query, documentId) and Google Embed Query output (embedding with `values`). Check connections. |
 | Empty or poor answers | Increase **n_results** in **Build Chroma Query** (e.g. 8); or check that chunks and query are embedded with the same model. |
 
