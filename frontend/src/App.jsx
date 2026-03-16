@@ -68,7 +68,11 @@ function App() {
         // backend responded with non-200 or error object
         const resp = err.response.data || {};
         if (resp.error) {
-          setError(resp.error + (resp.details ? `: ${JSON.stringify(resp.details)}` : ''))
+          let msg = resp.error
+          if (resp.details && typeof resp.details === 'object') msg += ' — ' + (resp.details.message || JSON.stringify(resp.details))
+          else if (resp.details) msg += ' — ' + String(resp.details)
+          if (resp.hint) msg += '\n\n' + resp.hint
+          setError(msg)
         } else {
           setError(resp || 'Analysis failed')
         }

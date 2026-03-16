@@ -56,8 +56,8 @@ app.post("/analyze", upload.single("document"), async (req, res) => {
 
     // Send extracted text + query to n8n using the field names expected by the workflow
     // the webhook node expects `text` (not documentText) so we provide both for compatibility.
-    // Path must match the Webhook node path in n8n (e.g. "document-review")
-    const webhookUrl = process.env.N8N_WEBHOOK_URL || "http://localhost:5678/webhook-test/document-review";
+    // Path must match the Webhook node path in n8n (e.g. "document-review"). Use /webhook/ for production when workflow is Active.
+    const webhookUrl = process.env.N8N_WEBHOOK_URL || "http://localhost:5678/webhook/document-review";
     console.log("Sending to n8n webhook", webhookUrl, { query, textLength: documentText.length });
     let n8nResponse;
     try {
@@ -102,15 +102,20 @@ app.post("/analyze", upload.single("document"), async (req, res) => {
       console.warn("Failed to remove temp file:", cleanupError.message);
     }
 
-    // n8nResponse.data may be a string (plain text answer) or an object.
+    // n8nResponse.data may be a string (plain text answer) or an object { answer: "..." }.
     // If it's empty or falsy, treat as an error to surface upstream.
     let responseData = n8nResponse.data;
     if (!responseData && responseData !== 0) {
-      console.warn("n8n returned empty response");
+      console.warn("n8n returned empty response", {
+        status: n8nResponse.status,
+        headers: n8nResponse.headers,
+        dataType: typeof n8nResponse.data,
+      });
       return res.status(502).json({
         success: false,
         error: "Workflow returned no data",
         details: n8nResponse.data,
+        hint: "Check n8n Executions for errors. Ensure workflow is Active, webhook URL is http://localhost:5678/webhook/document-review, and Chroma (port 8010), Gemini and Groq keys are set.",
       });
     }
     return res.json({

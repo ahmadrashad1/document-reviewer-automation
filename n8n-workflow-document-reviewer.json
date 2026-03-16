@@ -60,12 +60,12 @@
     {
       "parameters": {
         "mode": "combine",
-        "combinationMode": "multiplex",
+        "combinationMode": "mergeByPosition",
         "options": {}
       },
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [900, 380],
+      "typeVersion": 2,
+      "position": [1120, 380],
       "id": "merge-chunk-embed",
       "name": "Merge Chunk + Embed"
     },
@@ -147,11 +147,11 @@
     {
       "parameters": {
         "mode": "combine",
-        "combinationMode": "multiplex",
+        "combinationMode": "mergeByPosition",
         "options": {}
       },
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [2000, 300],
       "id": "merge-query-embed",
       "name": "Merge Query + Embed"
@@ -262,9 +262,7 @@
       ]
     },
     "Google Embed Query": {
-      "main": [
-        [{ "node": "Merge Query + Embed", "type": "main", "index": 1 }]
-      ]
+      "main": [[{ "node": "Merge Query + Embed", "type": "main", "index": 1 }]]
     },
     "Merge Query + Embed": {
       "main": [
