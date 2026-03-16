@@ -22,29 +22,38 @@ Same webhook contract: **input** `{ text, query }`, **output** `{ answer }`.
 
 | Service        | Port / API | Purpose |
 |----------------|------------|--------|
-| **Chroma**     | 8000       | Vector store; collection name `documents`. |
+| **Chroma**     | 8010 (embedded) or 8000 (Docker) | Vector store; collection name `documents`. |
 | **Google Gemini** | API key | Embeddings model `gemini-embedding-001` (free tier at [Google AI Studio](https://aistudio.google.com/apikey)). |
 | **Groq**       | API key    | LLM for generation (in n8n). |
 
 ---
 
-## Chroma
+## Chroma (vector store)
 
-1. **Start Chroma** (from project root):
+### Option A: Embedded Chroma (recommended — no Docker)
+
+Uses Chroma as a library with `PersistentClient`; a small Python server exposes the same HTTP API on port **8010** (to avoid conflict with official Chroma on 8000). No separate Chroma server or Docker required.
+
+1. **Install and start** (from project root):
    ```powershell
-   .\scripts\start-chroma.ps1
+   pip install -r chroma-embedded/requirements.txt
+   python chroma-embedded/server.py
    ```
-   Or run Chroma manually (e.g. `chroma run --path ./n8n/chroma --port 8000`).
+   Or run `.\scripts\start-chroma-embedded.ps1`.
 
-2. **Create the collection** (one-time):
-   ```powershell
-   python scripts/setup_chroma.py
-   ```
-   Or use `.\scripts\setup-chroma-collection.ps1` if you prefer PowerShell.
+2. The **documents** collection is created automatically on first use. Data is stored in `chroma-embedded/chroma_data/`.
 
-3. **Verify:** Open http://localhost:8000 (if Chroma exposes a simple UI) or rely on the workflow; failed Chroma calls will show in n8n execution.
+3. **Verify:** `GET http://localhost:8010/api/v1/heartbeat` should return 200.
 
-If your Chroma API uses a **collection ID** (UUID) instead of the name `documents`, update the **Chroma Add** and **Chroma Query** nodes in the workflow: replace `documents` in the URL path with your collection id (e.g. `http://localhost:8000/api/v1/collections/<collection-id>/add`).
+See [chroma-embedded/README.md](../chroma-embedded/README.md) for details.
+
+### Option B: Chroma server (Docker)
+
+If you prefer the official Chroma server:
+
+1. Run `.\scripts\start-chroma.ps1` (requires Docker).
+2. Create the collection once: `python scripts/setup_chroma.py`.
+3. The n8n workflow uses the embedded Chroma URLs (`http://localhost:8010/api/v1/collections/documents/...`). If you use Docker Chroma on 8000, change those URLs in the workflow to port 8000.
 
 ---
 
@@ -85,7 +94,7 @@ The workflow reads `embedding.values` from the response and uses it for Chroma a
 | Issue | Check |
 |-------|--------|
 | "No embeddings received from Gemini" | Valid Gemini API key in **Google Embed Chunks** / **Google Embed Query** (`x-goog-api-key` header); key has access to Embedding API; request body uses `content.parts[].text`. |
-| Chroma add/query fails | Chroma running on 8000; collection `documents` exists (`python scripts/setup_chroma.py`); correct collection name or id in node URLs. |
+| Chroma add/query fails | Embedded: Chroma running on 8010 (`.\scripts\start-chroma-embedded.ps1`). Docker: port 8000; run `python scripts/setup_chroma.py` to create collection `documents`. Ensure workflow node URLs use the correct port. |
 | "Query embedding missing" | Merge node **Merge Query + Embed** must receive both Pass Query + DocId output (query, documentId) and Google Embed Query output (embedding with `values`). Check connections. |
 | Empty or poor answers | Increase **n_results** in **Build Chroma Query** (e.g. 8); or check that chunks and query are embedded with the same model. |
 

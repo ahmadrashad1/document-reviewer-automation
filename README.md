@@ -8,13 +8,13 @@
 
 ## Run on Windows
 
-**Prerequisites:** Node.js (LTS), Docker Desktop (for n8n), a [Groq API key](https://console.groq.com) (free), a [Google AI / Gemini API key](https://aistudio.google.com/apikey) (free tier), and **Chroma** (port 8000). Use **PowerShell**; run all commands from the **project root** (`document-reviewer-automation`).
+**Prerequisites:** Node.js (LTS), Docker Desktop (for n8n), a [Groq API key](https://console.groq.com) (free), a [Google AI / Gemini API key](https://aistudio.google.com/apikey) (free tier), and **Chroma** (embedded on port 8010, or Docker on 8000). Use **PowerShell**; run all commands from the **project root** (`document-reviewer-automation`).
 
 | Step | Action |
 |------|--------|
 | 1 | **Install:** `npm install --prefix ai-doc-backend` then `npm install --prefix frontend` |
 | 2 | **Start n8n:** `.\scripts\start-n8n-docker.ps1` (or `docker run -d --name n8n-document-reviewer -p 5678:5678 n8nio/n8n:latest`) |
-| 3 | **Start Chroma:** `.\scripts\start-chroma.ps1` then create collection: `python scripts/setup_chroma.py` (see [docs/RAG_SETUP.md](docs/RAG_SETUP.md)) |
+| 3 | **Start Chroma (embedded, no Docker):** `pip install -r chroma-embedded/requirements.txt` then `python chroma-embedded/server.py` (or `.\scripts\start-chroma-embedded.ps1`). See [chroma-embedded/README.md](chroma-embedded/README.md). |
 | 4 | **Get Gemini API key:** Create a key at [Google AI Studio](https://aistudio.google.com/apikey) (free tier supports `gemini-embedding-001`) |
 | 5 | **Import workflow:** Open http://localhost:5678 → Workflows → Import from File → select `n8n-workflow-document-reviewer.json` → set **Groq Generate** node Authorization to `Bearer YOUR_GROQ_API_KEY` → set **Google Embed Chunks** and **Google Embed Query** nodes header `x-goog-api-key` to your Gemini API key → Save → set workflow **Active** (toggle ON) |
 | 6 | **Backend env:** Ensure `ai-doc-backend\.env` contains `N8N_WEBHOOK_URL=http://localhost:5678/webhook/document-review` and `PORT=5000` |
@@ -22,7 +22,7 @@
 | 8 | **Start frontend:** In a new terminal: `cd frontend; npm run dev` |
 | 9 | **Use app:** Open http://localhost:3000 → upload a PDF (e.g. `test.pdf`) → enter a question → **Analyze** |
 
-**URLs:** n8n http://localhost:5678 · Backend http://localhost:5000 · Frontend http://localhost:3000 · Chroma http://localhost:8000  
+**URLs:** n8n http://localhost:5678 · Backend http://localhost:5000 · Frontend http://localhost:3000 · Chroma (embedded) http://localhost:8010  
 
 If the frontend shows "webhook is not registered", turn the workflow **Active** in n8n (top-right toggle). See [NEXT_STEPS.md](NEXT_STEPS.md) for more detail and troubleshooting.
 
@@ -39,7 +39,7 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
        │                                    │  pdf-parse                                              │
        │                                    ▼                                                          │
        │                             Extracts text from PDF                                            ▼
-       └──────────────────────────── Response: { answer } ◄──────────────────────────────────── Chroma (8000) + Google Gemini API + Groq
+       └──────────────────────────── Response: { answer } ◄──────────────────────────────────── Chroma (8010 embedded) + Google Gemini API + Groq
 ```
 
 - **Frontend:** Upload PDF, enter query, call backend `/analyze`, display the answer.
@@ -53,7 +53,8 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
 | Path | Description |
 |------|-------------|
 | **`n8n-workflow-document-reviewer.json`** | **Main n8n workflow** — RAG pipeline: Webhook → Extract Body → Chunk Text → Google Embed (Gemini) → Chroma Add → Chroma Query → Build Prompt → Groq Generate → Respond to Webhook. |
-| **`scripts/`** | Helper scripts: `start-n8n-docker.ps1`, `health-check.ps1`, `test-workflow.ps1`, `setup_chroma.py`, and others. Run from project root (e.g. `.\scripts\start-n8n-docker.ps1`). |
+| **`chroma-embedded/`** | **Embedded Chroma** — Python service using PersistentClient (no Docker). Run `.\scripts\start-chroma-embedded.ps1` for the vector store on port 8010. |
+| **`scripts/`** | Helper scripts: `start-n8n-docker.ps1`, `start-chroma-embedded.ps1`, `health-check.ps1`, and others. Run from project root. |
 | **`docs/`** | All guides: setup, n8n workflow, Groq, Ollama troubleshooting, Chroma, Vercel. |
 | **`ai-doc-backend/`** | Express backend: PDF upload, text extraction, proxy to n8n webhook. |
 | **`frontend/`** | React (Vite) UI: file upload, query input, results display. |
@@ -72,7 +73,7 @@ If the frontend shows "webhook is not registered", turn the workflow **Active** 
 | **Backend** | `ai-doc-backend/` |
 | **Frontend** | `frontend/` |
 | **Backend env** | `ai-doc-backend/.env` (copy from `.env.example`) |
-| **Chroma + Gemini (RAG)** | `scripts/start-chroma.ps1`, `scripts/setup_chroma.py`, and a [Gemini API key](https://aistudio.google.com/apikey) for `gemini-embedding-001` — required for the RAG workflow. See [docs/RAG_SETUP.md](docs/RAG_SETUP.md). |
+| **Chroma + Gemini (RAG)** | **Embedded (easiest):** `chroma-embedded/` — run `python chroma-embedded/server.py` (no Docker). Or use `scripts/start-chroma.ps1` for Docker. Plus a [Gemini API key](https://aistudio.google.com/apikey) for `gemini-embedding-001`. See [chroma-embedded/README.md](chroma-embedded/README.md) and [docs/RAG_SETUP.md](docs/RAG_SETUP.md). |
 
 **Optional reading:**
 
@@ -154,7 +155,7 @@ The frontend and backend contract is unchanged: **input** `{ text, query }`, **o
 | Frontend | 3000       | React UI |
 | Backend  | 5000       | PDF parsing, n8n proxy |
 | n8n      | 5678       | Workflow engine, webhook |
-| Chroma   | 8000       | Vector store for RAG (collection `documents`) |
+| Chroma (embedded) | 8010       | Vector store for RAG (collection `documents`). Use `.\scripts\start-chroma-embedded.ps1` |
 | Google Gemini | API key | Embeddings for RAG (`gemini-embedding-001`) |
 
 ---

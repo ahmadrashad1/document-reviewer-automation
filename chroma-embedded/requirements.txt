@@ -1,0 +1,4 @@
+# No chromadb - we implement a minimal Chroma-compatible API with hnswlib + local storage.
+hnswlib>=0.7.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0

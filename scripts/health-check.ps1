@@ -23,9 +23,9 @@ try {
 }
 
 # Check Chroma
-Write-Host "2. Chroma (port 8000)..." -NoNewline -ForegroundColor Yellow
+Write-Host "2. Chroma embedded (port 8010)..." -NoNewline -ForegroundColor Yellow
 try {
-    $response = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/collections" -Method GET -TimeoutSec 3 -ErrorAction Stop
+    $response = Invoke-RestMethod -Uri "http://localhost:8010/api/v1/collections" -Method GET -TimeoutSec 3 -ErrorAction Stop
     Write-Host " ✅ Running" -ForegroundColor Green
     $collections = if ($response -is [array]) { $response } else { @($response) }
     $documentsCollection = $collections | Where-Object { $_.name -eq "documents" }

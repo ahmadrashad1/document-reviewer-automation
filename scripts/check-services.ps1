@@ -28,9 +28,9 @@ try {
 }
 
 # Check Chroma
-Write-Host "Chroma (port 8000):" -NoNewline
+Write-Host "Chroma embedded (port 8010):" -NoNewline
 try {
-    $response = Invoke-WebRequest -Uri http://localhost:8000/api/v1/heartbeat -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+    $response = Invoke-WebRequest -Uri http://localhost:8010/api/v1/heartbeat -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
     Write-Host " ✅ Running" -ForegroundColor Green
 } catch {
     if ($_.Exception.Message -like "*deprecated*") {

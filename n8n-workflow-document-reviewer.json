@@ -71,7 +71,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build Chroma add payload from all chunk+embed items (Merge output)\nconst items = $input.all();\nconst extractBody = $('Extract Body').first().json;\nconst documentId = extractBody.documentId;\n\nconst ids = [];\nconst embeddings = [];\nconst metadatas = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const raw = item.embedding ?? (item.embeddings && item.embeddings[0]);\n  const embedding = raw?.values ?? (Array.isArray(raw) ? raw : null);\n  const docId = item.documentId ?? documentId;\n  if (Array.isArray(embedding)) {\n    ids.push(`${docId}-${i}`);\n    embeddings.push(embedding);\n    metadatas.push({ documentId: docId });\n  }\n}\n\nif (ids.length === 0) throw new Error('No embeddings received from Gemini');\n\nreturn [{ json: { ids, embeddings, metadatas, documentId } }];"
+        "jsCode": "// Build Chroma add payload from all chunk+embed items (Merge output)\nconst items = $input.all();\nconst extractBody = $('Extract Body').first().json;\nconst documentId = extractBody.documentId;\n\nconst ids = [];\nconst embeddings = [];\nconst metadatas = [];\nconst documents = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const raw = item.embedding ?? (item.embeddings && item.embeddings[0]);\n  const embedding = raw?.values ?? (Array.isArray(raw) ? raw : null);\n  const docId = item.documentId ?? documentId;\n  if (Array.isArray(embedding)) {\n    ids.push(`${docId}-${i}`);\n    embeddings.push(embedding);\n    metadatas.push({ documentId: docId });\n    documents.push(item.pageContent ?? '');\n  }\n}\n\nif (ids.length === 0) throw new Error('No embeddings received from Gemini');\n\nreturn [{ json: { ids, embeddings, metadatas, documents, documentId } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -82,7 +82,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/v1/collections/documents/add",
+        "url": "http://localhost:8010/api/v1/collections/documents/add",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -92,7 +92,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ ids: $json.ids, embeddings: $json.embeddings, metadatas: $json.metadatas }) }}",
+        "body": "={{ JSON.stringify({ ids: $json.ids, embeddings: $json.embeddings, metadatas: $json.metadatas, documents: $json.documents }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -159,7 +159,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/v1/collections/documents/query",
+        "url": "http://localhost:8010/api/v1/collections/documents/query",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
